@@ -54,7 +54,8 @@ flags = [
 '-fdata-sections',
 '-nostdlib',
 
-'-I', './src',
+'-I', './app',
+'-I', './midea-ir',
 '-I', '../esp-open-rtos/include',
 '-I', '../esp-open-rtos/libc/xtensa-lx106-elf/include',
 '-I', '../esp-open-rtos/extras/rboot-ota',

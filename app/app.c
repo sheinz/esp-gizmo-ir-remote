@@ -1,11 +1,3 @@
-/* A very simple OTA example
- *
- * Binds a TCP socket, reads an image from it over TFTP and then flashes live.
- *
- * For more information about esp-open-rtos OTA see https://github.com/SuperHouse/esp-open-rtos/wiki/OTA-Update-Configuration
- *
- * NOT SUITABLE TO PUT ON THE INTERNET OR INTO A PRODUCTION ENVIRONMENT!!!!
- */
 #include <stdio.h>
 #include "espressif/esp_common.h"
 #include "esp/uart.h"
@@ -17,9 +9,29 @@
 #include "ota-tftp.h"
 #include "rboot-api.h"
 
+#include "midea-ir.h"
+
+
+MideaIR ir;
+
+void test_task(void *pvParams)
+{
+    while (true) {
+        printf("Send IR data");
+
+        midea_ir_send(&ir);
+
+        vTaskDelay(3000);
+    }
+}
+
 void user_init(void)
 {
     uart_set_baud(0, 115200);
+
+    midea_ir_init(&ir);
+
+    xTaskCreate(test_task, (signed char *)"test_task", 256, NULL, 2, NULL);
 
     rboot_config conf = rboot_get_config();
     printf("\r\n\r\nOTA Basic demo.\r\nCurrently running on flash slot %d / %d.\r\n\r\n",

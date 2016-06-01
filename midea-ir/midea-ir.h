@@ -1,0 +1,36 @@
+#ifndef __MIDEA_IR_H__
+#define __MIDEA_IR_H__
+
+#include <stdint.h>
+#include <stdbool.h>
+
+
+typedef enum {
+    MODE_COOL       = 0b0000,
+    MODE_HEAT       = 0b1100,
+    MODE_AUTO       = 0b1000,
+    MODE_DEHUMIDIFY = 0b1000,
+} MideaMode;
+
+typedef enum {
+    FAN_OFF     = 0b1110,
+    FAN_LOW     = 0b1001,
+    FAN_MEDIUM  = 0b0101,
+    FAN_HIGH    = 0b0011,
+    FAN_AUTO    = 0b1011,
+} MideaFanLevel;
+
+typedef struct {
+    uint8_t temperature; // in Celsius
+    MideaFanLevel fan_level;
+    MideaMode mode;
+    bool enabled;        // on/off air conditioner
+} MideaIR;
+
+void midea_ir_init(MideaIR *ir);
+
+void midea_ir_send(MideaIR *ir);
+
+void midea_ir_move_deflector(MideaIR *ir);
+
+#endif  // __MIDEA_IR_H__
