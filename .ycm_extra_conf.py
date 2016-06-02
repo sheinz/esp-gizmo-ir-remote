@@ -59,6 +59,7 @@ flags = [
 '-I', '../esp-open-rtos/include',
 '-I', '../esp-open-rtos/libc/xtensa-lx106-elf/include',
 '-I', '../esp-open-rtos/extras/rboot-ota',
+'-I', '../esp-open-rtos/extras/pwm',
 '-I', '../esp-open-rtos/FreeRTOS/Source/include',
 '-I', '../esp-open-rtos/FreeRTOS/Source/portable/esp8266',
 '-I', '../esp-open-rtos/lwip/lwip/src/include',

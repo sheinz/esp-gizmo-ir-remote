@@ -1,5 +1,7 @@
 #include "midea-ir.h"
 #include <stdio.h>
+#include "pwm.h"
+#include "espressif/esp_misc.h"
 
 /**
  * Midea Air conditioner protocol consists of 3 data bytes.
@@ -54,14 +56,16 @@
 #define TEMP_LOW  17
 #define TEMP_HIGH 30
 
+// Time of one shortest impulse in microseconds
+#define TIME_T  555
 
 typedef struct 
 {
     uint8_t magic;      // 0xB2 always
-    uint8_t fan : 4; 
     uint8_t state : 4;
-    uint8_t temp : 4;
+    uint8_t fan : 4; 
     uint8_t command : 4;
+    uint8_t temp : 4;
 } DataPacket;
 
 
@@ -70,10 +74,10 @@ void pack_data(MideaIR *ir, DataPacket *data)
     data->magic = 0xB2;
     data->fan = ir->fan_level;
     if (ir->enabled) {
-        data->state = 0b1011;  // on
+        data->state = 0b1111;  // on
         data->command = ir->mode;
     } else {
-        data->state = 0b1111; // off
+        data->state = 0b1011; // off
         data->command = MODE_AUTO;
     }
     if (ir->temperature >= TEMP_LOW && ir->temperature <= TEMP_HIGH) {
@@ -86,6 +90,15 @@ void pack_data(MideaIR *ir, DataPacket *data)
 
 void midea_ir_init(MideaIR *ir)
 {
+    uint8_t pins[1];
+
+    pins[0] = 14;
+    pwm_init(1, pins);
+    pwm_set_freq(46300);
+    pwm_set_duty(UINT16_MAX/2);
+    /* pwm_start(); */
+    pwm_stop();
+
     ir->temperature = 24;
     ir->enabled = false;
     ir->mode = MODE_AUTO;
@@ -101,21 +114,79 @@ void print_bit(bool bit)
     }
 }
 
+void send_start()
+{
+    pwm_start();
+    sdk_os_delay_us(8 * TIME_T);
+    pwm_stop();
+    sdk_os_delay_us(8 * TIME_T);
+}
+
+void send_middle()
+{
+    sdk_os_delay_us(5200);
+    pwm_start();
+    sdk_os_delay_us(4400);
+    pwm_stop();
+    sdk_os_delay_us(4400);
+}
+
+void send_bit(bool bit)
+{
+    pwm_start();
+    sdk_os_delay_us(TIME_T);
+    pwm_stop();
+    if (bit) {
+        sdk_os_delay_us(3 * TIME_T);
+    } else {
+        sdk_os_delay_us(TIME_T);
+    }
+}
+
+void add_complementary_bytes(const uint8_t *src, uint8_t *dst)
+{
+    for (int i = 0; i < 3; i++) {
+        *dst = *src;
+        dst++;
+        *dst = ~(*src);
+        dst++;
+        src++;
+    }
+}
+
+
 void midea_ir_send(MideaIR *ir)
 {
     DataPacket packet; 
     pack_data(ir, &packet);
-    uint32_t *p = (uint32_t*)&packet;
+    uint8_t data[6];
+    add_complementary_bytes((uint8_t*)&packet, data);
 
-    printf("Data: ");
+    /* printf("Data: "); */
 
-    for (uint8_t i = 0; i < 24; i++)
-    {
-        print_bit(*p & 1);
-        *p >>= 1;
+    send_start();
+
+    for (int b = 0; b < 6; b++) {
+        uint8_t v = data[b];
+        for (uint8_t i = 0; i < 8; i++) {
+            /* print_bit(*p & (1<<7)); */
+            send_bit(v & (1<<7));
+            v <<= 1;
+        } 
     }
 
-    printf("\n");
+    send_middle();
+
+    for (int b = 0; b < 6; b++) {
+        uint8_t v = data[b];
+        for (uint8_t i = 0; i < 8; i++) {
+            /* print_bit(*p & (1<<7)); */
+            send_bit(v & (1<<7));
+            v <<= 1;
+        } 
+    }
+
+    /* printf("\n"); */
 }
 
 void midea_ir_move_deflector(MideaIR *ir)

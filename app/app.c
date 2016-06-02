@@ -16,12 +16,14 @@ MideaIR ir;
 
 void test_task(void *pvParams)
 {
+    const portTickType xDelay = 3000 / portTICK_RATE_MS;
+
     while (true) {
         printf("Send IR data");
 
         midea_ir_send(&ir);
 
-        vTaskDelay(3000);
+        vTaskDelay(xDelay);
     }
 }
 
