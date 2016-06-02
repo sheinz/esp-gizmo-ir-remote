@@ -1,7 +1,9 @@
 #include "midea-ir.h"
 #include <stdio.h>
-#include "pwm.h"
 #include "espressif/esp_misc.h"
+#include "esp/interrupts.h"
+#include "esp/gpio.h"
+#include "esp/timer.h"
 
 /**
  * Midea Air conditioner protocol consists of 3 data bytes.
@@ -69,6 +71,15 @@ typedef struct
 } DataPacket;
 
 
+static bool period_on;
+static const uint8_t pin_number = 2;
+
+static void timer_interrupt_handler(void)
+{
+    period_on = !period_on;
+    gpio_write(pin_number, period_on);
+}
+
 void pack_data(MideaIR *ir, DataPacket *data)
 {
     data->magic = 0xB2;
@@ -90,19 +101,19 @@ void pack_data(MideaIR *ir, DataPacket *data)
 
 void midea_ir_init(MideaIR *ir)
 {
-    uint8_t pins[1];
-
-    pins[0] = 14;
-    pwm_init(1, pins);
-    pwm_set_freq(46300);
-    pwm_set_duty(UINT16_MAX/2);
-    /* pwm_start(); */
-    pwm_stop();
-
     ir->temperature = 24;
     ir->enabled = false;
     ir->mode = MODE_AUTO;
     ir->fan_level = FAN_AUTO;
+
+    gpio_enable(pin_number, GPIO_OUTPUT);
+    period_on = false;
+    gpio_write(pin_number, false);
+
+    _xt_isr_attach(INUM_TIMER_FRC1, timer_interrupt_handler);
+    timer_set_frequency(FRC1, 38000 * 2);
+    timer_set_interrupts(FRC1, true);
+    timer_set_run(FRC1, true);
 }
 
 void print_bit(bool bit)
@@ -116,26 +127,26 @@ void print_bit(bool bit)
 
 void send_start()
 {
-    pwm_start();
+    /* pwm_start(); */
     sdk_os_delay_us(8 * TIME_T);
-    pwm_stop();
+    /* pwm_stop(); */
     sdk_os_delay_us(8 * TIME_T);
 }
 
 void send_middle()
 {
     sdk_os_delay_us(5200);
-    pwm_start();
+    /* pwm_start(); */
     sdk_os_delay_us(4400);
-    pwm_stop();
+    /* pwm_stop(); */
     sdk_os_delay_us(4400);
 }
 
 void send_bit(bool bit)
 {
-    pwm_start();
+    /* pwm_start(); */
     sdk_os_delay_us(TIME_T);
-    pwm_stop();
+    /* pwm_stop(); */
     if (bit) {
         sdk_os_delay_us(3 * TIME_T);
     } else {
