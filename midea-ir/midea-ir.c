@@ -36,7 +36,7 @@
  *      0101 - medium speed
  *      0011 - high speed
  *      1011 - automatic
- *      1110 - off
+ *      0111 - off
  *
  * ssss - State control (unconfirmed!)
  *      1111 - on
@@ -58,9 +58,6 @@
 #define TEMP_LOW  17
 #define TEMP_HIGH 30
 
-// Time of one shortest impulse in microseconds
-#define TIME_T  555
-
 typedef struct 
 {
     uint8_t magic;      // 0xB2 always
@@ -71,49 +68,79 @@ typedef struct
 } DataPacket;
 
 
-static bool period_on;
-static const uint8_t pin_number = 2;
+#define bit_buff_capacity 29                // 8T + 8T + (4T * 8 * 6) + 8T
+uint8_t bit_buff[bit_buff_capacity];        // pulses to spit out
+uint8_t bit_buff_size;
+uint8_t repeat_count;                       // how many times to repeat
+uint8_t current_pulse;                      // current processing pulse
+const uint8_t sub_pulses_per_pulse = 42;    // (high + low) * 21
+uint8_t current_sub_pulse;                  // 38000 kHz pulse
+
+
+static const uint8_t pin_number = 14;
 
 static void timer_interrupt_handler(void)
 {
-    period_on = !period_on;
-    gpio_write(pin_number, period_on);
+    // get bit number 'current_pulse'
+    bool pulse_val = bit_buff[current_pulse/8] & (1<<(current_pulse%8));
+
+    if (current_sub_pulse < sub_pulses_per_pulse) {
+        if (!(current_sub_pulse % 2) && pulse_val) {
+            gpio_write(pin_number, true);
+        } else {
+            gpio_write(pin_number, false);
+        }
+        current_sub_pulse++;
+    } else { // pulse is finished
+        current_sub_pulse = 0;
+        current_pulse++;
+        if (current_pulse >= bit_buff_size) {
+            repeat_count--;
+            if (repeat_count) {
+                current_pulse = 0;
+                current_sub_pulse = 0;
+            } else {
+                timer_set_run(FRC1, false);
+            }
+        }
+    }
 }
 
 void pack_data(MideaIR *ir, DataPacket *data)
 {
     data->magic = 0xB2;
-    data->fan = ir->fan_level;
     if (ir->enabled) {
+        data->fan = ir->fan_level;
         data->state = 0b1111;  // on
         data->command = ir->mode;
-    } else {
-        data->state = 0b1011; // off
-        data->command = MODE_AUTO;
-    }
-    if (ir->temperature >= TEMP_LOW && ir->temperature <= TEMP_HIGH) {
+
+        if (ir->temperature >= TEMP_LOW && ir->temperature <= TEMP_HIGH) {
         // TODO: check
-        data->temp = ir->temperature - TEMP_LOW;
+            data->temp = ir->temperature - TEMP_LOW;
+        } else {
+            data->temp = 0b0100;
+        }
     } else {
-        data->temp = 24 - TEMP_LOW;
+        data->fan = 0b0111;
+        data->state = 0b1011; // off
+        data->command = 0b0000;
+        data->temp = 0b1110;
     }
 }
 
 void midea_ir_init(MideaIR *ir)
 {
     ir->temperature = 24;
-    ir->enabled = false;
+    ir->enabled = true;
     ir->mode = MODE_AUTO;
     ir->fan_level = FAN_AUTO;
 
     gpio_enable(pin_number, GPIO_OUTPUT);
-    period_on = false;
     gpio_write(pin_number, false);
 
     _xt_isr_attach(INUM_TIMER_FRC1, timer_interrupt_handler);
     timer_set_frequency(FRC1, 38000 * 2);
     timer_set_interrupts(FRC1, true);
-    timer_set_run(FRC1, true);
 }
 
 void print_bit(bool bit)
@@ -125,36 +152,51 @@ void print_bit(bool bit)
     }
 }
 
-void send_start()
+static inline void init_buff()
 {
-    /* pwm_start(); */
-    sdk_os_delay_us(8 * TIME_T);
-    /* pwm_stop(); */
-    sdk_os_delay_us(8 * TIME_T);
-}
+    current_pulse = 0;
+    current_sub_pulse = 0;
 
-void send_middle()
-{
-    sdk_os_delay_us(5200);
-    /* pwm_start(); */
-    sdk_os_delay_us(4400);
-    /* pwm_stop(); */
-    sdk_os_delay_us(4400);
-}
-
-void send_bit(bool bit)
-{
-    /* pwm_start(); */
-    sdk_os_delay_us(TIME_T);
-    /* pwm_stop(); */
-    if (bit) {
-        sdk_os_delay_us(3 * TIME_T);
-    } else {
-        sdk_os_delay_us(TIME_T);
+    for (uint8_t i = 0; i < bit_buff_capacity; i++) {
+        bit_buff[i] = 0;
     }
 }
 
-void add_complementary_bytes(const uint8_t *src, uint8_t *dst)
+static inline void add_start()
+{
+    bit_buff[0] = 0b11111111; 
+    bit_buff[1] = 0b00000000; 
+    current_pulse = 8 * 2;
+}
+
+static inline void add_bit(bool bit)
+{
+    bit_buff[current_pulse/8] |= (1<<(current_pulse%8));
+    current_pulse++;
+
+    if (bit) {
+        current_pulse += 3;
+    } else {
+        current_pulse++;        
+    }
+}
+
+static inline void add_stop()
+{
+    add_bit(true);
+    current_pulse += 8;
+}
+
+static inline void start()
+{
+    bit_buff_size = current_pulse; 
+    current_pulse = 0;
+    current_sub_pulse = 0;
+    repeat_count = 2;
+    timer_set_run(FRC1, true);
+}
+
+static inline void add_complementary_bytes(const uint8_t *src, uint8_t *dst)
 {
     for (int i = 0; i < 3; i++) {
         *dst = *src;
@@ -165,7 +207,6 @@ void add_complementary_bytes(const uint8_t *src, uint8_t *dst)
     }
 }
 
-
 void midea_ir_send(MideaIR *ir)
 {
     DataPacket packet; 
@@ -175,28 +216,19 @@ void midea_ir_send(MideaIR *ir)
 
     /* printf("Data: "); */
 
-    send_start();
+    init_buff();
+    add_start();
 
     for (int b = 0; b < 6; b++) {
         uint8_t v = data[b];
         for (uint8_t i = 0; i < 8; i++) {
             /* print_bit(*p & (1<<7)); */
-            send_bit(v & (1<<7));
+            add_bit(v & (1<<7));
             v <<= 1;
         } 
     }
-
-    send_middle();
-
-    for (int b = 0; b < 6; b++) {
-        uint8_t v = data[b];
-        for (uint8_t i = 0; i < 8; i++) {
-            /* print_bit(*p & (1<<7)); */
-            send_bit(v & (1<<7));
-            v <<= 1;
-        } 
-    }
-
+    add_stop();
+    start();
     /* printf("\n"); */
 }
 

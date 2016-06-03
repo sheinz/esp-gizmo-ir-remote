@@ -11,19 +11,24 @@
 
 #include "midea-ir.h"
 
+#include "esp/gpio.h"
+
 
 MideaIR ir;
 
+bool on = false;
+
 void test_task(void *pvParams)
 {
-    const portTickType xDelay = 3000 / portTICK_RATE_MS;
+    const portTickType xDelay = 10000 / portTICK_RATE_MS;
 
     while (true) {
-        printf("Send IR data");
+        ir.enabled = on;
 
         midea_ir_send(&ir);
 
         vTaskDelay(xDelay);
+        on = !on;
     }
 }
 
