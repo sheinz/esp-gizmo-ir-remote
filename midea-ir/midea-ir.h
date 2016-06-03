@@ -27,10 +27,19 @@ typedef struct {
     bool enabled;        // on/off air conditioner
 } MideaIR;
 
+/**
+ * Initialize Ir module and ir structure with default values
+ */
 void midea_ir_init(MideaIR *ir);
 
+/**
+ * Send Ir signal to air conditioner
+ */
 void midea_ir_send(MideaIR *ir);
 
+/**
+ * Send Ir signal to move deflector
+ */
 void midea_ir_move_deflector(MideaIR *ir);
 
 #endif  // __MIDEA_IR_H__
