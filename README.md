@@ -35,12 +35,12 @@ The device will publish its status changes using topic
 #### Status message specification
 
 The status message format:
-    "SSS mode TT FF"
+    "SSS mode TT F"
 
  * SSS - "on"/"off"
  * mode - one of "auto","cool","heat","fan"
  * TT - temperature in Celsius
- * FF - fan level
+ * F - fan level
 
 The status message is published each time a command is received.
 

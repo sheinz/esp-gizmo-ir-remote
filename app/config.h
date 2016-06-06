@@ -16,4 +16,7 @@ const char* config_get_ssid_pass();
 const char* config_get_mqtt_host();
 const int config_get_mqtt_port();
 
+const char* config_get_status_topic();
+const char* config_get_cmd_topic();
+
 #endif // __CONFIG_H__
