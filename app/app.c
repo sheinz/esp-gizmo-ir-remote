@@ -5,7 +5,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "esp8266.h"
-#include "ssid_config.h"
+
+#include "config.h"
 
 #include "ota-tftp.h"
 #include "rboot-api.h"
@@ -17,12 +18,37 @@
 
 #include "esp/gpio.h"
 
-#define MQTT_HOST ("162.243.215.71")
-#define MQTT_PORT 1883
-#define CLIENT_ID "test_client"
+static MideaIR ir;
 
-MideaIR ir;
 
+static void process_command(const char *cmd)
+{
+    if (!strcmp(cmd, "on")) {
+        ir.enabled = true; 
+    } else if (!strcmp(cmd, "off")) {
+        ir.enabled = false;
+    } else if (!strcmp(cmd, "auto")) {
+        ir.mode = MODE_AUTO;
+    } else if (!strcmp(cmd, "cool")) {
+        ir.mode = MODE_COOL;
+    } else if (!strcmp(cmd, "heat")) {
+        ir.mode = MODE_HEAT;
+    } else if (!strncmp(cmd, "temp", 4)) {
+        ir.temperature = atoi(&cmd[5]);
+    } else if (!strcmp(cmd, "blow")) {
+        ir.mode = MODE_FAN;
+    } else if (!strncmp(cmd, "fan", 3)) {
+        ir.fan_level = atoi(&cmd[4]);
+    } else if (!strcmp(cmd, "direct")) {
+        midea_ir_move_deflector(&ir);
+        return;
+    } else {
+        printf("Unknown  command: %s\n", cmd);
+        return;
+    }
+    printf("Sending ir code\n");
+    midea_ir_send(&ir); 
+}
 
 static void  topic_received(MessageData *md)
 {
@@ -47,13 +73,28 @@ static void  topic_received(MessageData *md)
         ir.enabled = true;
         midea_ir_send(&ir);
     } else if (!strcmp(cmd, "off")) {
-        ir.enabled = false; 
+        ir.enabled = false;
         midea_ir_send(&ir);
     } else if (!strcmp(cmd, "move")) {
         midea_ir_move_deflector(&ir);
     } else {
         printf("unknown command\n");
     }
+}
+
+#define TOPIC_BUFF_SIZE 128
+static char topic[TOPIC_BUFF_SIZE];
+static inline const char *get_topic()
+{
+    topic[0] = '/';
+    strcat(topic, config_get_location());
+    strcat(topic, "/");
+    strcat(topic, CONFIG_DEVICE_TYPE);
+    strcat(topic, "/");
+    strcat(topic, config_get_name());
+    strcat(topic, "/status");
+
+    return topic;
 }
 
 static inline void mqtt_task()
@@ -66,16 +107,15 @@ static inline void mqtt_task()
     MQTTPacket_connectData data = MQTTPacket_connectData_initializer;
 
     NewNetwork( &network );
-    strcpy(client_id, "mqtt_example");
+    strcpy(client_id, "esp-gizmo-ir");
 
-    printf("Creating network");
-    printf("Network created\n");
-
-    ConnectNetwork(&network, MQTT_HOST, MQTT_PORT);
+    if (ConnectNetwork(&network, config_get_mqtt_host(),
+                config_get_mqtt_port()) != 0) {
+        printf("Connect to MQTT server failed\n");
+        return;
+    }
 
     NewMQTTClient(&client, &network, 5000, mqtt_buf, 100, mqtt_readbuf, 100);
-
-    printf("created mqtt client\n");
 
     data.willFlag       = 0;
     data.MQTTVersion    = 3;
@@ -86,21 +126,32 @@ static inline void mqtt_task()
     data.cleansession   = 0;
 
     printf("Send MQTT connect ... \n");
-    MQTTConnect(&client, &data);
+    if (MQTTConnect(&client, &data) != 0) {
+        printf("MQTT connect failed\n");
+        return;
+    }
 
     printf("Sibscribe to topic\n");
-    MQTTSubscribe(&client, "/esptopic", QOS1, topic_received);
-
-    while(1){
-        int ret = MQTTYield(&client, 1000);
-        if (ret == DISCONNECTED)
-            break;
+    if (MQTTSubscribe(&client, get_topic(), QOS1, topic_received) != 0) {
+        printf("Subscription failed\n");
+        return;
     }
-    printf("Connection dropped, request restart\n\r");
+
+    while (MQTTYield(&client, 1000) != DISCONNECTED) {
+    };
+
+    printf("Connection dropped, request restart\n");
 }
 
-void test_task(void *pvParams)
+static void main_task(void *pvParams)
 {
+    struct sdk_station_config config;
+    strcpy((char*)config.ssid, config_get_ssid());
+    strcpy((char*)config.password, config_get_ssid_pass());
+
+    sdk_wifi_set_opmode(STATION_MODE);
+    sdk_wifi_station_set_config(&config);
+
     while (true) {
         uint8_t status = sdk_wifi_station_get_connect_status();
         if (status == STATION_GOT_IP) {
@@ -118,24 +169,17 @@ void user_init(void)
 
     midea_ir_init(&ir, 14);
 
-
     rboot_config conf = rboot_get_config();
-    printf("\r\n\r\nOTA Basic demo.\r\nCurrently running on flash slot %d / %d.\r\n\r\n",
+    printf("Currently running on flash slot %d / %d\n",
            conf.current_rom, conf.count);
 
-    printf("Image addresses in flash:\r\n");
+    printf("Image addresses in flash:\n");
     for(int i = 0; i <conf.count; i++) {
-        printf("%c%d: offset 0x%08x\r\n", i == conf.current_rom ? '*':' ', i, conf.roms[i]);
+        printf("%c%d: offset 0x%08x\n", i == conf.current_rom ? '*':' ', i,
+                conf.roms[i]);
     }
 
-    struct sdk_station_config config = {
-        .ssid = WIFI_SSID,
-        .password = WIFI_PASS,
-    };
-    sdk_wifi_set_opmode(STATION_MODE);
-    sdk_wifi_station_set_config(&config);
-
-    xTaskCreate(test_task, (signed char *)"test_task", 1024, NULL, 4, NULL);
+    xTaskCreate(main_task, (signed char *)"main", 1024, NULL, 4, NULL);
 
     ota_tftp_init_server(TFTP_PORT);
 }
