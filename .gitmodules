@@ -1,3 +1,6 @@
 [submodule "midea-ir"]
 	path = midea-ir
 	url = https://github.com/sheinz/esp-midea-ir
+[submodule "simple-httpd"]
+	path = simple-httpd
+	url = https://github.com/sheinz/simple-httpd
