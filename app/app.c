@@ -261,6 +261,16 @@ static void httpd_task(void *pvParams)
     httpd_serve(&httpd, 80);
 }
 
+static void test_task(void *pvParams)
+{
+    while (true) {
+        vTaskDelay(5000/portTICK_RATE_MS);
+        printf("Test config start\n");
+        config_test();
+        printf("Test config finished\n");
+    }
+}
+
 void user_init(void)
 {
     uart_set_baud(0, 115200);
@@ -280,7 +290,7 @@ void user_init(void)
 
     xTaskCreate(main_task, (signed char *)"main", 512, NULL, 4, NULL);
     xTaskCreate(httpd_task, (signed char *)"httpd", 512, NULL, 2, NULL);
-
+    xTaskCreate(test_task, (signed char *)"test", 512, NULL, 2, NULL);
 
     ota_tftp_init_server(TFTP_PORT);
 }

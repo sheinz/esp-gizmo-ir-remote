@@ -7,6 +7,8 @@
 
 void config_init();
 
+void config_test();
+
 const char* config_get_name();
 const char* config_get_location();
 
