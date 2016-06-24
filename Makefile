@@ -2,8 +2,10 @@ PROGRAM = esp-gizmo-ir-remote
 OTA = 1
 DEVICE_IP = 192.168.0.100
 
-EXTRA_COMPONENTS := extras/rboot-ota extras/pwm ./midea-ir 
-EXTRA_COMPONENTS += ./simple-httpd extras/paho_mqtt_c
+EXTRA_COMPONENTS := extras/rboot-ota extras/pwm extras/paho_mqtt_c
+EXTRA_COMPONENTS += ./midea-ir 
+EXTRA_COMPONENTS += ./simple-httpd
+EXTRA_COMPONENTS += ./esp-config
 
 PROGRAM_SRC_DIR = ./app
 ESPPORT = /dev/tty.SLAB_USBtoUART

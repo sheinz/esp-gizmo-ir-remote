@@ -1,5 +1,5 @@
-#ifndef __CONFIG_H__
-#define __CONFIG_H__
+#ifndef __APP_CONFIG_H__
+#define __APP_CONFIG_H__
 
 #include <stdint.h>
 
@@ -21,4 +21,4 @@ const int config_get_mqtt_port();
 const char* config_get_status_topic();
 const char* config_get_cmd_topic();
 
-#endif // __CONFIG_H__
+#endif // __APP_CONFIG_H__

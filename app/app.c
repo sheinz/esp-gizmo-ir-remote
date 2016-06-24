@@ -6,7 +6,7 @@
 #include "task.h"
 #include "esp8266.h"
 
-#include "config.h"
+#include "app_config.h"
 
 #include "ota-tftp.h"
 #include "rboot-api.h"

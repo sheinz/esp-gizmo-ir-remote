@@ -58,6 +58,7 @@ flags = [
 '-I', './app',
 '-I', './midea-ir',
 '-I', './simple-httpd',
+'-I', './esp-config',
 '-I', '../esp-open-rtos/include',
 '-I', '../esp-open-rtos/libc/xtensa-lx106-elf/include',
 '-I', '../esp-open-rtos/extras/rboot-ota',
