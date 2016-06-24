@@ -26,7 +26,7 @@
  *
  * For example:
  * +-------+-------+----+----+-------+----------+
- * | AA 55 | 00 0C | 01 | 05 | XX XX | "test\0" |
+ * | AA 55 | 0C 00 | 01 | 05 | XX XX | "test\0" |
  * +-------+-------+----+----+-------+----------+
  * where XX XX - checksum of "test\0" (5 bytes)
  * 0C - 12 bytes of data items (4 byte header + 8 bytes data 
@@ -206,7 +206,7 @@ uint8_t config_read(ConfigItem *items, uint8_t size)
             break;  // something wrong
         }
     }
-    if (!data_length) {  // not all data is read
+    if (data_length) {  // not all data is read
         printf("There's still data in the flash\n");
     }
     return counter;
@@ -216,7 +216,7 @@ static inline uint16_t total_data_length(ConfigItem *items, uint8_t size)
 {
     uint16_t total = 0;
     for (uint8_t i = 0; i < size; i++) {
-        total += allign_size(items[i].length);
+        total += sizeof(DataHeader) + allign_size(items[i].length);
     }
     return total;
 }
