@@ -9,6 +9,8 @@ void config_init();
 
 void config_test();
 
+void start_config_server();
+
 const char* config_get_name();
 const char* config_get_location();
 

@@ -22,7 +22,6 @@
 static MideaIR ir;
 static MQTTClient mqtt_client = DefaultClient;
 
-
 #define STATUS_BUFF_SIZE 32
 static inline void publish_status()
 {
@@ -192,74 +191,6 @@ static void main_task(void *pvParams)
     }
 }
 
-static char index_html[] = "\
-<html><body><h1>Hello world</h1>\
-<form action=\"upload\" method=\"post\" enctype=\"multipart/form-data\">\
-Param1 <input type=\"text\" name=\"param_1\"><br>\
-Param2 <input type=\"text\" name=\"param_2\"><br>\
-Param3 <input type=\"text\" name=\"param_3\"><br>\
-<input type=\"file\" name=\"firmware\" id=\"firmware\"><br>\
-<input type=\"submit\" value=\"Upload\">\
-</form></body></html>\r\n\r\n";
-
-static void http_req_handler(Httpd *httpd, const char *url, MethodType method)
-{
-    switch (method) {
-        case HTTP_GET:
-            printf("Http get request for url %s received\n", url);
-            if (!strcmp(url, "/")) {
-                httpd_send_header(httpd, true);
-                httpd_send_data(httpd, index_html, strlen(index_html));
-            } else {
-                httpd_send_header(httpd, false);
-            }
-            break;
-        case HTTP_POST:
-            printf("Http post request for url %s received\n", url);
-            if (!strcmp(url, "/upload")) {
-                httpd_send_header(httpd, true);
-            } else {
-                httpd_send_header(httpd, false);
-            }
-            httpd->user_data = 0;
-            break;
-        default:
-            printf("Unknown method\n");
-    }
-}
-
-static void http_data_handler(Httpd *httpd, const char *name, 
-        const void *data, uint16_t len)
-{
-    printf("data name=%s, len=%d\n", name, len);
-}
-
-static void http_data_complete_handler(Httpd *httpd, bool result)
-{
-    printf("data transfer complete\n"); 
-    if (result) {
-        char page[] = "<html><body>\
-<h2>Successfuly uploaded.</h2></body></html>";
-        httpd_send_data(httpd, page, strlen(page));
-    } else {
-        char page[] = "<html><body>\
-<h2>Fail to upload.</h2></body></html>";
-        httpd_send_data(httpd, page, strlen(page));
-    }
-}
-
-static void httpd_task(void *pvParams)
-{
-    Httpd httpd;
-
-    httpd.req_handler = http_req_handler;
-    httpd.data_handler = http_data_handler;
-    httpd.data_complete_handler = http_data_complete_handler;
-
-    httpd_init(&httpd);
-
-    httpd_serve(&httpd, 80);
-}
 
 static void test_task(void *pvParams)
 {
@@ -287,10 +218,10 @@ void user_init(void)
         printf("%c%d: offset 0x%08x\n", i == conf.current_rom ? '*':' ', i,
                 conf.roms[i]);
     }
+    start_config_server();
 
     xTaskCreate(main_task, (signed char *)"main", 512, NULL, 4, NULL);
-    xTaskCreate(httpd_task, (signed char *)"httpd", 512, NULL, 2, NULL);
-    xTaskCreate(test_task, (signed char *)"test", 512, NULL, 2, NULL);
+    /* xTaskCreate(test_task, (signed char *)"test", 512, NULL, 2, NULL); */
 
     ota_tftp_init_server(TFTP_PORT);
 }

@@ -99,10 +99,18 @@ static inline void alligned_free(void *p, uint8_t offset)
     free((char*)p - offset);
 }
 
+/**
+ * Very simple checksum calculation
+ */
 static uint16_t calculate_checksum(const char *data, uint8_t size)
 {
-    // TODO: implmenet
-    return 0;
+    uint16_t sum = 0;
+
+    for (uint8_t i = 0; i < size; i++) {
+        sum += data[i];
+    }
+    
+    return sum;
 }
 
 static inline uint16_t read_main_header()
@@ -274,29 +282,3 @@ void config_free(ConfigItem *items, uint8_t size)
         items[i].data = 0;
     }
 }
-    
-/* void config_test() */
-/* { */
-/*     for (uint8_t i = 0; i < CONFIG_ID_SIZE; i++) { */
-/*         char *buff = (char*)malloc(32); */
-/*         sprintf(buff, "test %d", i); */
-/*         config[i].data = buff; */
-/*     } */
-/*  */
-/*     config_write(); */
-/*  */
-/*     printf("test reading\n"); */
-/*     for (uint8_t i = 0; i < CONFIG_ID_SIZE; i++) { */
-/*         free(config[i].data); */
-/*         config[i].data = 0; */
-/*     } */
-/*  */
-/*     config_read(); */
-/*  */
-/*     for (uint8_t i = 0; i < CONFIG_ID_SIZE; i++) { */
-/*         printf("config %d, data: %s\n", i, config[i].data); */
-/*         free(config[i].data); */
-/*         config[i].data = 0; */
-/*     } */
-/* } */
-

@@ -1,0 +1,50 @@
+<html>
+<body>
+<h1>esp-gizmo configuration</h1>
+
+<h2>Configuration</h2>
+<form action="config" method="post" enctype="multipart/form-data">
+<table>
+    <tr>
+        <td>Name</td>
+        <td><input type="text" name="name" value="air-con-ir"></td>
+    </tr>
+    <tr>
+        <td>Location</td>
+        <td><input type="text" name="Location"></td>
+    </tr>
+    <tr>
+        <td>WiFi SSID</td>
+        <td><input type="text" name="ssid"></td>
+    </tr>
+    <tr>
+        <td>WiFi password</td>
+        <td><input type="text" name="ssid_pass"></td>
+    </tr>
+    <tr>
+        <td>MQTT host</td>
+        <td><input type="text" name="mqtt_host"></td>
+    </tr>
+    <tr>
+        <td>MQTT port</td>
+        <td><input type="text" name="mqtt_port"></td>
+    </tr>
+    <tr>
+        <td colspan="2"><input type="submit" value="Save"></td></tr>
+</table>
+</form>
+<br>
+<h2>Firmware update</h2>
+<table>
+<form action="firmware" method="post" enctype="multipart/form-data">
+    <tr>
+        <td>Firmware</td>
+        <td><input type="file" name="firmware" id="firmware"></td>
+    </tr>
+    <tr>
+        <td colspan="2"><input type="submit" value="Upload"></td>
+    </tr>
+</form>
+</table>
+</body>
+</html>

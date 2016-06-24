@@ -1,9 +1,14 @@
 #include "app_config.h"
 #include "esp_config.h"
 #include "ssid_config.h"
+#include "FreeRTOS.h"
+#include "task.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+#include "httpd.h"
 
 static const char *name = "name_0";
 static const char *location = "room_0";
@@ -64,6 +69,72 @@ void config_test()
         free(config[i].data);
         config[i].data = 0;
     }
+}
+
+static const char index_html[] = 
+#include "index.const"
+
+static void http_req_handler(Httpd *httpd, const char *url, MethodType method)
+{
+    switch (method) {
+        case HTTP_GET:
+            printf("Http get request for url %s received\n", url);
+            if (!strcmp(url, "/")) {
+                httpd_send_header(httpd, true);
+                httpd_send_data(httpd, index_html, strlen(index_html));
+            } else {
+                httpd_send_header(httpd, false);
+            }
+            break;
+        case HTTP_POST:
+            printf("Http post request for url %s received\n", url);
+            if (!strcmp(url, "/config")) {
+                httpd_send_header(httpd, true);
+            } else {
+                httpd_send_header(httpd, false);
+            }
+            httpd->user_data = 0;
+            break;
+        default:
+            printf("Unknown method\n");
+    }
+}
+
+static void http_data_handler(Httpd *httpd, const char *name, 
+        const void *data, uint16_t len)
+{
+    printf("data name=%s, len=%d\n", name, len);
+}
+
+static void http_data_complete_handler(Httpd *httpd, bool result)
+{
+    printf("data transfer complete\n"); 
+    if (result) {
+        char page[] = "<html><body>\
+<h2>Successfuly uploaded.</h2></body></html>";
+        httpd_send_data(httpd, page, strlen(page));
+    } else {
+        char page[] = "<html><body>\
+<h2>Fail to upload.</h2></body></html>";
+        httpd_send_data(httpd, page, strlen(page));
+    }
+}
+static void httpd_task(void *pvParams)
+{
+    Httpd httpd;
+
+    httpd.req_handler = http_req_handler;
+    httpd.data_handler = http_data_handler;
+    httpd.data_complete_handler = http_data_complete_handler;
+
+    httpd_init(&httpd);
+
+    httpd_serve(&httpd, 80);
+}
+
+void start_config_server()
+{
+    xTaskCreate(httpd_task, (signed char *)"httpd", 512, NULL, 2, NULL);
 }
 
 static inline void fill_topic_base(char *str_buff)
